@@ -227,3 +227,8 @@ export async function getAnimeRecommendationsById(id: number): Promise<JikanReco
   const data = await fetchWithRetry<JikanApiResponse<JikanRecommendation[]>>(`/anime/${id}/recommendations`);
   return data?.data ?? [];
 }
+
+export async function getTopCharacters(): Promise<JikanCharacter[]> {
+  const data = await fetchWithRetry<JikanApiResponse<JikanCharacter[]>>("/top/characters");
+  return data?.data ?? [];
+}
