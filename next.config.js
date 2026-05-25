@@ -8,10 +8,6 @@ const nextConfig = {
     // Allows build to succeed even if there are TypeScript errors
     ignoreBuildErrors: false,
   },
-  eslint: {
-    // Run ESLint during build
-    ignoreDuringBuilds: false,
-  },
 };
 
 module.exports = nextConfig;
