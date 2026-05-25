@@ -73,6 +73,29 @@ export async function getTopAnimeByFilter(filter: string): Promise<JikanAnime[]>
   return data?.data ?? [];
 }
 
+export async function searchAnime(query: string): Promise<JikanAnime[]> {
+  const data = await fetchWithRetry<JikanApiResponse<JikanAnime[]>>(`/anime?q=${encodeURIComponent(query)}`);
+  return data?.data ?? [];
+}
+
+export async function getAnimeNews() {
+  for (const id of FALLBACK_NEWS_ANIME_IDS) {
+    const data = await fetchWithRetry<JikanApiResponse<any[]>>(`/anime/${id}/news`);
+    if (data?.data && data.data.length > 0) {
+      return data.data.map((item: any) => ({
+        mal_id: item.mal_id,
+        url: item.url,
+        title: item.title,
+        date: item.date,
+        author: item.author_username,
+        summary: item.excerpt,
+        image: item.images?.jpg?.image_url,
+      }));
+    }
+  }
+  return [];
+}
+
 // ─── Consumet Helpers ─────────────────────────────────────────────────────
 async function consumetFetch(path: string) {
   for (const baseUrl of CONSUMET_MIRRORS) {
