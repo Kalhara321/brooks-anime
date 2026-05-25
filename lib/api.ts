@@ -8,7 +8,6 @@ import type {
   JikanRecommendation,
 } from "./types";
 
-const FALLBACK_NEWS_ANIME_IDS = [21, 5114, 9253, 20];
 const BASE_URL = "https://api.jikan.moe/v4";
 
 const CONSUMET_MIRRORS = [
@@ -18,6 +17,13 @@ const CONSUMET_MIRRORS = [
   "https://consumet-instance.vercel.app/anime/gogoanime",
   "https://api.consumet.org/anime/gogoanime",
 ];
+
+/**
+ * Jikan (MAL) IDs used to fetch news if the main request fails.
+ * IDs: One Piece, Fullmetal Alchemist, Steins;Gate, Naruto.
+ */
+const FALLBACK_NEWS_ANIME_IDS = [21, 5114, 9253, 20];
+
 
 // ─── Jikan Rate Limit ─────────────────────────────────────────────────────
 let lastRequestTime = 0;
@@ -36,7 +42,7 @@ async function fetchWithRetry<T>(endpoint: string, retries = 5): Promise<T | nul
   for (let i = 0; i < retries; i++) {
     try {
       await waitForRateLimit();
-      const res = await fetch(`${BASE_URL}${endpoint}`, { next: { revalidate: 60 } });
+      const res = await fetch(`${BASE_URL}${endpoint}`, { next: { revalidate: 3600 } });
 
       if (res.status === 429) {
         await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
@@ -54,22 +60,28 @@ async function fetchWithRetry<T>(endpoint: string, retries = 5): Promise<T | nul
 }
 
 export async function getAiringSchedule(): Promise<JikanAnime[]> {
-  const data = await fetchWithRetry<JikanApiResponse<JikanAnime[]>>("/seasons/now");
+  const data = await fetchWithRetry<JikanApiResponse<JikanAnime[]>>("/schedules");
   return data?.data ?? [];
 }
 
 export async function getTrendingAnime(): Promise<JikanAnime[]> {
-  const data = await fetchWithRetry<JikanApiResponse<JikanAnime[]>>("/top/anime?filter=bypopularity");
+  const data = await fetchWithRetry<JikanApiResponse<JikanAnime[]>>(
+    "/top/anime?filter=bypopularity"
+  );
   return data?.data ?? [];
 }
 
 export async function getSeasonNow(): Promise<JikanAnime[]> {
-  const data = await fetchWithRetry<JikanApiResponse<JikanAnime[]>>("/seasons/now");
+  const data = await fetchWithRetry<JikanApiResponse<JikanAnime[]>>(
+    "/seasons/now"
+  );
   return data?.data ?? [];
 }
 
 export async function getTopAnimeByFilter(filter: string): Promise<JikanAnime[]> {
-  const data = await fetchWithRetry<JikanApiResponse<JikanAnime[]>>(`/top/anime?filter=${filter}`);
+  const data = await fetchWithRetry<JikanApiResponse<JikanAnime[]>>(
+    `/top/anime?filter=${filter}`
+  );
   return data?.data ?? [];
 }
 
@@ -101,7 +113,7 @@ async function consumetFetch(path: string) {
   for (const baseUrl of CONSUMET_MIRRORS) {
     try {
       const res = await fetch(`${baseUrl}${path}`, {
-        next: { revalidate: 3600 },
+        next: { revalidate: 1800 },
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) continue;
@@ -146,39 +158,72 @@ export async function getConsumetEpisodes(title: string) {
     });
 
     if (!infoRes.ok) return null;
-    return await infoRes.json();
+    const infoData = await infoRes.json();
+    return {
+      ...infoData,
+      totalEpisodes: infoData.totalEpisodes || infoData.episodes?.length || 0,
+    };
   } catch (e) {
     console.error("[getConsumetEpisodes]", e);
     return null;
   }
 }
 
-export async function getStreamSources(episodeId: string) {
+/**
+ * Fetches streaming links for a specific Gogoanime episode ID.
+ * Uses server-side fetching to bypass CORS.
+ */
+export async function getStreamSources(episodeId: string): Promise<any> {
   for (const baseUrl of CONSUMET_MIRRORS) {
     try {
       const res = await fetch(`${baseUrl}/watch/${episodeId}`, {
-        cache: "no-store",
-        signal: AbortSignal.timeout(12000),
+        next: { revalidate: 3600 },
+        signal: AbortSignal.timeout(10000),
       });
       if (!res.ok) continue;
       const data = await res.json();
-      if (Array.isArray(data?.sources) && data.sources.length > 0) {
-        return data;
-      }
+      if (data?.sources?.length > 0) return data;
     } catch {}
   }
   return { sources: [] };
 }
 
-// Jikan functions (keep your existing ones)
+/**
+ * Fetches detailed info for a single anime using its MAL ID.
+ */
 export async function getAnimeById(id: string): Promise<JikanAnime | null> {
   const data = await fetchWithRetry<JikanApiResponse<JikanAnime>>(`/anime/${id}/full`);
   return data?.data ?? null;
 }
 
-export async function getAnimeRecommendations() {
+/**
+ * Fetches the list of episodes from Jikan (MyAnimeList).
+ */
+export async function getAnimeEpisodes(id: string) {
+  const data = await fetchWithRetry<JikanApiResponse<any[]>>(`/anime/${id}/episodes`);
+  return data?.data ?? [];
+}
+
+/**
+ * Fetches characters for a specific anime ID.
+ */
+export async function getAnimeCharacters(id: number): Promise<JikanCharacter[]> {
+  const data = await fetchWithRetry<JikanApiResponse<JikanCharacter[]>>(`/anime/${id}/characters`);
+  return data?.data ?? [];
+}
+
+/**
+ * Fetches general anime recommendations.
+ */
+export async function getAnimeRecommendations(): Promise<JikanRecommendation[]> {
   const data = await fetchWithRetry<JikanApiResponse<JikanRecommendation[]>>("/recommendations/anime");
   return data?.data ?? [];
 }
 
-// Add your other Jikan functions here...
+/**
+ * Fetches similar anime recommendations based on a specific MAL ID.
+ */
+export async function getAnimeRecommendationsById(id: number): Promise<JikanRecommendation[]> {
+  const data = await fetchWithRetry<JikanApiResponse<JikanRecommendation[]>>(`/anime/${id}/recommendations`);
+  return data?.data ?? [];
+}

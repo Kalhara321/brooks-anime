@@ -26,6 +26,7 @@ export type JikanAnime = {
   type?: string;
   synopsis?: string;
   episodes?: number | null;
+  totalEpisodes?: number;
   genres?: JikanGenre[];
   broadcast?: { time?: string; day?: string; string?: string };
   airingEpisode?: { episode?: number };

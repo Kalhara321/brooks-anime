@@ -224,8 +224,10 @@ export default async function AnimeDetailsPage({
             episodes={Array.from({ length: totalEpisodes }, (_, i) => ({
               mal_id: i + 1,
               title: `Episode ${i + 1}`,
+              number: i + 1,
             }))}
             currentEpisode={currentEpisode}
+            totalEpisodes={totalEpisodes}
           />
 
           {/* RELATED */}
